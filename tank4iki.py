@@ -1,6 +1,5 @@
 import pygame
 import sys
-import random
 
 pygame.init()
 
@@ -19,24 +18,31 @@ GRAY = (169, 169, 169)
 font = pygame.font.Font(None, 36)
 
 class Tank(pygame.sprite.Sprite):
-    def __init__(self, x, y, color):
+    def __init__(self, x, y, color, initial_direction):
         super().__init__()
-        self.original_image = pygame.Surface((50, 30))  # Оригинальная поверхность танка
-        self.original_image.fill(color)  # Заполнение цветом
-        self.image = self.original_image  # Текущее изображение танка
+        self.color = color
+        self.image = pygame.Surface((50, 50), pygame.SRCALPHA)
         self.rect = self.image.get_rect(center=(x, y))
         self.start_position = (x, y)
         self.speed = 1
-        self.speed_x = 0
-        self.speed_y = 0
         self.score = 0
-        self.direction = 'right'
+        self.direction = initial_direction
         self.last_shot_time = 0
         self.shoot_delay = 1000
         self.is_respawning = False
-        self.respawn_timer = 0
-        self.invulnerable_time = 3000  # Время неуязвимости при респауне (в миллисекундах)
+        self.invulnerable_time = 3000
         self.invulnerable_end_time = 0
+        self.draw_tank()
+
+    def draw_tank(self):
+        self.image.fill((0, 0, 0, 0))  # Clear previous image
+        points = {
+            'right': [(0, 0), (50, 25), (0, 50)],
+            'left': [(50, 0), (0, 25), (50, 50)],
+            'up': [(0, 50), (25, 0), (50, 50)],
+            'down': [(0, 0), (25, 50), (50, 0)]
+        }
+        pygame.draw.polygon(self.image, self.color, points[self.direction])
 
     def move(self, dx, dy):
         if self.is_respawning:
@@ -46,18 +52,13 @@ class Tank(pygame.sprite.Sprite):
         self.rect.x += dx * self.speed
         self.rect.y += dy * self.speed
 
-        for wall in walls:
-            if pygame.sprite.collide_rect(self, wall):
-                self.rect = old_rect
-                return
-
-        for tank in tanks:
-            if tank != self and pygame.sprite.collide_rect(self, tank):
-                self.rect = old_rect
-                return
+        if any(pygame.sprite.collide_rect(self, wall) for wall in walls) or \
+           any(tank != self and pygame.sprite.collide_rect(self, tank) for tank in tanks):
+            self.rect = old_rect
+        else:
+            self.update_direction(dx, dy)
 
         self.rect.clamp_ip(screen.get_rect())
-        self.update_direction(dx, dy)
 
     def update_direction(self, dx, dy):
         if dx > 0:
@@ -69,22 +70,7 @@ class Tank(pygame.sprite.Sprite):
         elif dy < 0:
             self.direction = 'up'
 
-        self.rotate()
-
-    def rotate(self):
-        if self.direction == 'right':
-            angle = 0
-        elif self.direction == 'left':
-            angle = 180
-        elif self.direction == 'down':
-            angle = 90
-        elif self.direction == 'up':
-            angle = 270
-
-        old_center = self.rect.center
-        self.image = pygame.transform.rotate(self.original_image, angle)
-        self.rect = self.image.get_rect()
-        self.rect.center = old_center
+        self.draw_tank()
 
     def can_shoot(self):
         current_time = pygame.time.get_ticks()
@@ -99,14 +85,11 @@ class Tank(pygame.sprite.Sprite):
     def respawn(self):
         self.is_respawning = True
         self.rect.center = self.start_position
-        self.respawn_timer = pygame.time.get_ticks()
-        self.invulnerable_end_time = pygame.time.get_ticks() + self.invulnerable_time  # Установка времени окончания неуязвимости
+        self.invulnerable_end_time = pygame.time.get_ticks() + self.invulnerable_time
 
     def update(self):
-        if self.is_respawning:
-            current_time = pygame.time.get_ticks()
-            if current_time >= self.invulnerable_end_time:
-                self.is_respawning = False
+        if self.is_respawning and pygame.time.get_ticks() >= self.invulnerable_end_time:
+            self.is_respawning = False
 
     def draw(self, surface):
         surface.blit(self.image, self.rect)
@@ -122,7 +105,7 @@ class Bullet(pygame.sprite.Sprite):
         self.target_tank = target_tank
 
     def update(self):
-        if not self.target_tank.is_respawning:  # Проверка, что танк не в режиме неуязвимости
+        if not self.target_tank.is_respawning:
             if self.direction == "up":
                 self.rect.y -= self.speed
             elif self.direction == "down":
@@ -134,7 +117,6 @@ class Bullet(pygame.sprite.Sprite):
 
             if pygame.sprite.collide_rect(self, self.target_tank):
                 self.target_tank.score += 1
-                print(f"Score for {self.target_tank}: {self.target_tank.score}")
                 self.kill()
 
                 if self.target_tank.score > 0:
@@ -152,21 +134,14 @@ class Wall(pygame.sprite.Sprite):
         self.rect = self.image.get_rect(topleft=(x, y))
 
 walls = pygame.sprite.Group()
-wall1 = Wall(200, 150, 20, 100, GRAY)
-wall2 = Wall(400, 300, 20, 200, GRAY)
-wall3 = Wall(600, 100, 20, 150, GRAY)
-wall4 = Wall(100, 400, 20, 100, GRAY)
-walls.add(wall1, wall2, wall3, wall4)
+walls.add(Wall(200, 150, 20, 100, GRAY), Wall(400, 300, 20, 200, GRAY),
+          Wall(600, 100, 20, 150, GRAY), Wall(100, 400, 20, 100, GRAY))
 
-tank1 = Tank(100, SCREEN_HEIGHT // 2, BLACK)
-tank2 = Tank(SCREEN_WIDTH - 100, SCREEN_HEIGHT // 2, RED)
+tank1 = Tank(100, SCREEN_HEIGHT // 2, BLACK, 'right')
+tank2 = Tank(SCREEN_WIDTH - 100, SCREEN_HEIGHT // 2, RED, 'left')
 
-all_sprites = pygame.sprite.Group()
-all_sprites.add(tank1, tank2)
-all_sprites.add(walls)
-
-tanks = pygame.sprite.Group()
-tanks.add(tank1, tank2)
+all_sprites = pygame.sprite.Group(tank1, tank2, *walls)
+tanks = pygame.sprite.Group(tank1, tank2)
 
 running = True
 while running:
@@ -207,7 +182,7 @@ while running:
     screen.blit(text, (10, 10))
 
     pygame.display.flip()
-    clock.tick(500)
+    clock.tick(400)
 
 pygame.quit()
 sys.exit()
