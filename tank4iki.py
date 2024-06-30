@@ -11,16 +11,17 @@ screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
 pygame.display.set_caption("Перестрелка")
 
 WHITE = (255, 255, 255)
-BLACK = (0, 0, 0)
-RED = (255, 0, 0)
+BLACK = (255, 0, 0)  # Изменен цвет первого танка на красный
+RED = (0, 0, 0)      # Изменен цвет второго танка на черный
 GRAY = (169, 169, 169)
 
 font = pygame.font.Font(None, 36)
 
 class Tank(pygame.sprite.Sprite):
-    def __init__(self, x, y, color, initial_direction):
+    def __init__(self, x, y, color, initial_direction, name):
         super().__init__()
         self.color = color
+        self.name = name
         self.image = pygame.Surface((50, 50), pygame.SRCALPHA)
         self.rect = self.image.get_rect(center=(x, y))
         self.start_position = (x, y)
@@ -35,7 +36,7 @@ class Tank(pygame.sprite.Sprite):
         self.draw_tank()
 
     def draw_tank(self):
-        self.image.fill((0, 0, 0, 0))  # Clear previous image
+        self.image.fill((0, 0, 0, 0))
         points = {
             'right': [(0, 0), (50, 25), (0, 50)],
             'left': [(50, 0), (0, 25), (50, 50)],
@@ -119,6 +120,14 @@ class Bullet(pygame.sprite.Sprite):
                 self.target_tank.score += 1
                 self.kill()
 
+                if self.target_tank.score >= 5:
+                    print(f"Выиграл танк {self.target_tank.name}")
+
+                    if tank1.score >= 5:
+                        tank1.color, tank2.color = tank2.color, tank1.color  
+                    elif tank2.score >= 5:
+                        tank1.color, tank2.color = tank2.color, tank1.color  
+
                 if self.target_tank.score > 0:
                     self.target_tank.respawn()
 
@@ -137,8 +146,8 @@ walls = pygame.sprite.Group()
 walls.add(Wall(200, 150, 20, 100, GRAY), Wall(400, 300, 20, 200, GRAY),
           Wall(600, 100, 20, 150, GRAY), Wall(100, 400, 20, 100, GRAY))
 
-tank1 = Tank(100, SCREEN_HEIGHT // 2, BLACK, 'right')
-tank2 = Tank(SCREEN_WIDTH - 100, SCREEN_HEIGHT // 2, RED, 'left')
+tank1 = Tank(100, SCREEN_HEIGHT // 2, BLACK, 'right', 'Чёрный - 1')
+tank2 = Tank(SCREEN_WIDTH - 100, SCREEN_HEIGHT // 2, RED, 'left', 'Красный - 2')
 
 all_sprites = pygame.sprite.Group(tank1, tank2, *walls)
 tanks = pygame.sprite.Group(tank1, tank2)
@@ -183,6 +192,9 @@ while running:
 
     pygame.display.flip()
     clock.tick(400)
+
+    if tank1.score >= 5 or tank2.score >= 5:
+        running = False
 
 pygame.quit()
 sys.exit()
