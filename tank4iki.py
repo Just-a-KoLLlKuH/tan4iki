@@ -11,18 +11,17 @@ screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
 pygame.display.set_caption("Перестрелка")
 
 WHITE = (255, 255, 255)
-BLACK = (255, 0, 0)  # Изменен цвет первого танка на красный
-RED = (0, 0, 0)      # Изменен цвет второго танка на черный
+BLACK = (0, 0, 0)
+RED = (255, 0, 0)
 GRAY = (169, 169, 169)
 
 font = pygame.font.Font(None, 36)
 
 class Tank(pygame.sprite.Sprite):
-    def __init__(self, x, y, color, initial_direction, name):
+    def __init__(self, x, y, image_path, initial_direction, name):
         super().__init__()
-        self.color = color
-        self.name = name
-        self.image = pygame.Surface((50, 50), pygame.SRCALPHA)
+        self.image_orig = pygame.image.load(image_path).convert_alpha()
+        self.image = pygame.transform.scale(self.image_orig, (50, 50))
         self.rect = self.image.get_rect(center=(x, y))
         self.start_position = (x, y)
         self.speed = 1
@@ -33,17 +32,7 @@ class Tank(pygame.sprite.Sprite):
         self.is_respawning = False
         self.invulnerable_time = 3000
         self.invulnerable_end_time = 0
-        self.draw_tank()
-
-    def draw_tank(self):
-        self.image.fill((0, 0, 0, 0))
-        points = {
-            'right': [(0, 0), (50, 25), (0, 50)],
-            'left': [(50, 0), (0, 25), (50, 50)],
-            'up': [(0, 50), (25, 0), (50, 50)],
-            'down': [(0, 0), (25, 50), (50, 0)]
-        }
-        pygame.draw.polygon(self.image, self.color, points[self.direction])
+        self.name = name
 
     def move(self, dx, dy):
         if self.is_respawning:
@@ -53,6 +42,7 @@ class Tank(pygame.sprite.Sprite):
         self.rect.x += dx * self.speed
         self.rect.y += dy * self.speed
 
+        # Collision detection logic
         if any(pygame.sprite.collide_rect(self, wall) for wall in walls) or \
            any(tank != self and pygame.sprite.collide_rect(self, tank) for tank in tanks):
             self.rect = old_rect
@@ -70,8 +60,6 @@ class Tank(pygame.sprite.Sprite):
             self.direction = 'down'
         elif dy < 0:
             self.direction = 'up'
-
-        self.draw_tank()
 
     def can_shoot(self):
         current_time = pygame.time.get_ticks()
@@ -124,9 +112,9 @@ class Bullet(pygame.sprite.Sprite):
                     print(f"Выиграл танк {self.target_tank.name}")
 
                     if tank1.score >= 5:
-                        tank1.color, tank2.color = tank2.color, tank1.color  
+                        tank1.image, tank2.image = tank2.image, tank1.image  
                     elif tank2.score >= 5:
-                        tank1.color, tank2.color = tank2.color, tank1.color  
+                        tank1.image, tank2.image = tank2.image, tank1.image  
 
                 if self.target_tank.score > 0:
                     self.target_tank.respawn()
@@ -146,8 +134,8 @@ walls = pygame.sprite.Group()
 walls.add(Wall(200, 150, 20, 100, GRAY), Wall(400, 300, 20, 200, GRAY),
           Wall(600, 100, 20, 150, GRAY), Wall(100, 400, 20, 100, GRAY))
 
-tank1 = Tank(100, SCREEN_HEIGHT // 2, BLACK, 'right', 'Чёрный - 1')
-tank2 = Tank(SCREEN_WIDTH - 100, SCREEN_HEIGHT // 2, RED, 'left', 'Красный - 2')
+tank1 = Tank(100, SCREEN_HEIGHT // 2, 'tank1.png', 'right', 'Чёрный - 1')
+tank2 = Tank(SCREEN_WIDTH - 100, SCREEN_HEIGHT // 2, 'tank2.png', 'left', 'Красный - 2')
 
 all_sprites = pygame.sprite.Group(tank1, tank2, *walls)
 tanks = pygame.sprite.Group(tank1, tank2)
@@ -191,10 +179,11 @@ while running:
     screen.blit(text, (10, 10))
 
     pygame.display.flip()
-    clock.tick(400)
+    clock.tick(60)
 
     if tank1.score >= 5 or tank2.score >= 5:
         running = False
 
 pygame.quit()
 sys.exit()
+
